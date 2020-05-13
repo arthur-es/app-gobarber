@@ -1,7 +1,14 @@
 import React, { useCallback, useRef } from 'react';
+import { Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Form } from '@unform/mobile';
 import { FormHandles } from '@unform/core';
+
+import * as Yup from 'yup';
+
+import getValidationErrors from '../../utils/getValidationErrors';
+
+import { useAuth } from '../../hooks/Auth';
 
 import {
   Image,
@@ -28,15 +35,54 @@ import {
   CreateAccountButtonText,
 } from './styles';
 
+interface SignInFormData {
+  email: string;
+  password: string;
+}
+
 const SignIn: React.FC = () => {
   const formRef = useRef<FormHandles>(null);
   const navigation = useNavigation();
 
   const passwordInputRef = useRef<TextInput>(null);
 
-  const handleSignIn = useCallback((data) => {
-    console.log(data);
-  }, []);
+  const { signIn, user } = useAuth();
+
+  const handleSubmit = useCallback(
+    async (data: SignInFormData) => {
+      try {
+        formRef.current?.setErrors({});
+        const schema = Yup.object().shape({
+          email: Yup.string()
+            .email('Entre com um e-mail válido')
+            .required('O e-mail é obrigatório'),
+          password: Yup.string().required('A senha é um campo obrigatório'),
+        });
+
+        await schema.validate(data, {
+          abortEarly: false,
+        });
+
+        await signIn({
+          email: data.email,
+          password: data.password,
+        });
+      } catch (err) {
+        if (err instanceof Yup.ValidationError) {
+          const errors = getValidationErrors(err);
+          formRef.current?.setErrors(errors);
+
+          return;
+        }
+
+        Alert.alert(
+          'Erro na autenticação',
+          'Ocorreu um erro ao fazer login, cheque as credenciais',
+        );
+      }
+    },
+    [signIn],
+  );
 
   return (
     <>
@@ -55,7 +101,7 @@ const SignIn: React.FC = () => {
               <Title>Faça seu logon</Title>
             </View>
 
-            <Form onSubmit={handleSignIn} ref={formRef}>
+            <Form onSubmit={handleSubmit} ref={formRef}>
               <Input
                 autoCorrect={false}
                 autoCapitalize="none"
